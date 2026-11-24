@@ -1,27 +1,35 @@
 from .sbox import SBOX
 
-ByteData = bytes | bytearray | memoryview
+ByteData = bytes | bytearray | memoryview | list[int] | tuple[int, ...]
 
 def _validate_bytes16(data: ByteData, name: str) -> bytes:
-    """Kiem tra du lieu dau vao phai la bytes-like va dung 16 byte."""
-    if not isinstance(data, (bytes, bytearray, memoryview)):
-        raise TypeError(f"{name} must be bytes, bytearray, or memoryview")
-    raw = bytes(data)
+    """Kiem tra du lieu dau vao la bytes-like hoac list/tuple gom 16 byte."""
+    if isinstance(data, (bytes, bytearray, memoryview)):
+        raw = bytes(data)
+    elif isinstance(data, (list, tuple)):
+        if not all(
+            isinstance(b, int) and not isinstance(b, bool) for b in data
+        ):
+            raise TypeError(f"{name} elements must be integers")
+        raw = bytes(data)
+    else:
+        raise TypeError(
+            f"{name} must be bytes, bytearray, memoryview, "
+            "or list/tuple of ints"
+        )
+
     if len(raw) != 16:
         raise ValueError(f"{name} length must be exactly 16 bytes")
     return raw
 
-
 def _xtime(value: int) -> int:
-    """Nhan mot byte voi x (0x02) trong truong huu han GF(2^8)."""
+    """Nhan mot byte voi 0x02 trong truong huu han GF(2^8) (0x11B)."""
     return ((value << 1) ^ 0x1B) & 0xFF if (value & 0x80) else (value << 1)
-
 
 def sub_bytes(state: ByteData) -> bytearray:
     """Thay the tung byte trong state bang bang tra S-Box (ham thuan)."""
     raw = _validate_bytes16(state, "state")
     return bytearray(SBOX[b] for b in raw)
-
 
 def shift_rows(state: ByteData) -> bytearray:
     """Dich trai hang r di r vi tri theo thu tu column-major (FIPS-197)."""
